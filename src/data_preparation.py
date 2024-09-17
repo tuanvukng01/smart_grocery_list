@@ -1,9 +1,8 @@
 import os
 import scipy.io
+import cv2
 import numpy as np
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from utils.utils import save_images
 
 # Paths
 train_mat_file_path = 'path_to_training_mat_file.mat'  # Update with your training .mat file path
@@ -39,6 +38,25 @@ def load_food_data(mat_file_path):
     return food_ids, food_names, food_images
 
 
+# Function to save images to the output directory
+def save_images(images, labels, output_dir):
+    """
+    Saves processed images to the output directory.
+
+    :param images: List of preprocessed images
+    :param labels: Corresponding labels (IDs) for each image
+    :param output_dir: Directory where the processed images will be saved
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for idx, img in enumerate(images):
+        label = labels[idx]
+        img_path = os.path.join(output_dir, f"{label}_{idx}.jpg")
+        cv2.imwrite(img_path, img)
+        print(f"Saved image {img_path}")
+
+
 # Function to preprocess images and split data
 def preprocess_images(food_ids, food_images, food_names, output_dir, img_size, test_size):
     """
@@ -60,7 +78,7 @@ def preprocess_images(food_ids, food_images, food_names, output_dir, img_size, t
         # Construct the full path to the image
         full_image_path = os.path.join(data_dir, image_path)
 
-        # Read and resize the image (assuming OpenCV is used)
+        # Read and resize the image (using OpenCV)
         img = cv2.imread(full_image_path)
         if img is not None:
             img = cv2.resize(img, img_size)
@@ -76,7 +94,7 @@ def preprocess_images(food_ids, food_images, food_names, output_dir, img_size, t
     # Split the data into training and validation sets
     X_train, X_val, y_train, y_val = train_test_split(images, labels, test_size=test_size, random_state=42)
 
-    # Save preprocessed images (this is just an example, update to match your image saving method)
+    # Save preprocessed images
     save_images(X_train, y_train, os.path.join(output_dir, 'train'))
     save_images(X_val, y_val, os.path.join(output_dir, 'val'))
 
