@@ -1,0 +1,10 @@
+tensorflow
+keras
+opencv-python
+numpy
+pandas
+scikit-learn
+matplotlib
+pillow
+# Example of a correct Python version specifier
+some_package; python_version >= "3.7"

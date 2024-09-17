@@ -1,0 +1,29 @@
+# Python-related
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.env
+.venv/
+venv/
+
+# Model and dataset files
+models/
+data/
+logs/
+
+# Ignore virtual environment
+venv/
+env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
