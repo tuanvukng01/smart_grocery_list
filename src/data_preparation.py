@@ -1,12 +1,12 @@
 import os
-import scipy.io
 import cv2
+import scipy.io
 import numpy as np
 from sklearn.model_selection import train_test_split
 
 # Paths
 train_mat_file_path = 'path_to_training_mat_file.mat'  # Update with your training .mat file path
-data_dir = 'data/food475/'  # Path to your dataset directory containing images
+image_folder = 'data/food475/images/'  # Folder where images are stored
 output_dir = 'data/processed/'  # Where the processed images will be saved
 
 # Image settings
@@ -14,28 +14,40 @@ img_size = (224, 224)  # Image size for resizing
 test_size = 0.2  # Fraction of data for validation
 
 
-# Function to load food names and images from the .mat file
+# Function to load food names and IDs
 def load_food_data(mat_file_path):
     """
-    Loads the food names and IDs, and retrieves corresponding image paths.
+    Loads the food names and IDs from a .mat file.
 
     :param mat_file_path: Path to the .mat file containing food data
-    :return: Tuple (food_ids, food_names, food_images) where food_images are file paths to images
+    :return: Tuple (food_ids, food_names)
     """
     # Load the .mat file
     mat = scipy.io.loadmat(mat_file_path)
 
-    # Extract relevant data (modify keys if necessary based on file structure)
-    food_names = mat['name']  # Extract food names
+    # Extract relevant data
     food_ids = mat['id']  # Extract food IDs
-    food_images = mat['images']  # Extract image file paths (assuming these are available)
+    food_names = mat['name']  # Extract food names
 
     # Convert the extracted data into usable formats
     food_ids = [food_id[0] for food_id in food_ids]
     food_names = [food_name[0] for food_name in food_names]
-    food_images = [img[0] for img in food_images]
 
-    return food_ids, food_names, food_images
+    return food_ids, food_names
+
+
+# Function to construct image paths based on food IDs or names
+def get_image_path(food_id):
+    """
+    Constructs the image path based on the food ID.
+
+    :param food_id: ID of the food item
+    :return: Full image path
+    """
+    # Construct image path based on the food ID (adjust this to match your file structure)
+    image_filename = f"{food_id}.jpg"  # Assuming images are named by food ID
+    image_path = os.path.join(image_folder, image_filename)
+    return image_path
 
 
 # Function to save images to the output directory
@@ -58,34 +70,27 @@ def save_images(images, labels, output_dir):
 
 
 # Function to preprocess images and split data
-def preprocess_images(food_ids, food_images, food_names, output_dir, img_size, test_size):
+def preprocess_images(food_ids, output_dir, img_size, test_size):
     """
     Processes images and creates train/validation split.
 
     :param food_ids: List of food IDs
-    :param food_images: List of image file paths
-    :param food_names: List of food names
     :param output_dir: Directory to save processed images
     :param img_size: Tuple for resizing images
     :param test_size: Fraction of data for validation
     """
-    # Create a list to store processed image paths and labels
     images = []
     labels = []
 
-    # Loop through the images and process them
-    for idx, image_path in enumerate(food_images):
-        # Construct the full path to the image
-        full_image_path = os.path.join(data_dir, image_path)
+    for food_id in food_ids:
+        image_path = get_image_path(food_id)
 
         # Read and resize the image (using OpenCV)
-        img = cv2.imread(full_image_path)
+        img = cv2.imread(image_path)
         if img is not None:
             img = cv2.resize(img, img_size)
-
-            # Append the image and its corresponding label (food_id)
             images.append(img)
-            labels.append(food_ids[idx])
+            labels.append(food_id)
 
     # Convert lists to numpy arrays
     images = np.array(images)
@@ -103,7 +108,7 @@ def preprocess_images(food_ids, food_images, food_names, output_dir, img_size, t
 
 if __name__ == '__main__':
     # Load food data from the training .mat file
-    food_ids, food_names, food_images = load_food_data(train_mat_file_path)
+    food_ids, food_names = load_food_data(train_mat_file_path)
 
     # Preprocess images and split into train and validation sets
-    preprocess_images(food_ids, food_images, food_names, output_dir, img_size, test_size)
+    preprocess_images(food_ids, output_dir, img_size, test_size)
