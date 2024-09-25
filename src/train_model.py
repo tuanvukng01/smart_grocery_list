@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -23,14 +24,12 @@ data_transforms = {
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])  # Normalization based on ImageNet
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # Normalization based on ImageNet
     ]),
     'val': transforms.Compose([
         transforms.Resize(img_size),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
 }
 
@@ -38,7 +37,7 @@ data_transforms = {
 train_dataset = datasets.ImageFolder(train_dir, transform=data_transforms['train'])
 val_dataset = datasets.ImageFolder(val_dir, transform=data_transforms['val'])
 
-# Create data loaders
+# Create data loaders with num_workers for parallel data loading
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
@@ -47,14 +46,13 @@ def build_model(num_classes):
     """
     Builds the MobileNetV2 model with transfer learning.
     """
-    model = models.mobilenet_v2(pretrained=True)
-    model.classifier[1] = nn.Linear(model.last_channel, num_classes)
+    model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V2)  # Updated with weights
+    model.classifier[1] = nn.Linear(model.last_channel, num_classes)  # Custom classification head
     return model
 
 # Training function
 def train_model(train_loader, val_loader, num_classes, model_save_path, epochs):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     model = build_model(num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -64,8 +62,11 @@ def train_model(train_loader, val_loader, num_classes, model_save_path, epochs):
         running_loss = 0.0
         correct = 0
         total = 0
+        epoch_start_time = time.time()  # Track epoch start time
 
-        for inputs, labels in train_loader:
+        for batch_idx, (inputs, labels) in enumerate(train_loader):
+            batch_start_time = time.time()  # Track batch start time
+
             inputs, labels = inputs.to(device), labels.to(device)
 
             # Zero the parameter gradients
@@ -83,13 +84,16 @@ def train_model(train_loader, val_loader, num_classes, model_save_path, epochs):
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
 
+            # Print timing for each batch
+            print(f"Batch {batch_idx+1}/{len(train_loader)} took {time.time() - batch_start_time:.2f} seconds")
+
         train_loss = running_loss / len(train_loader.dataset)
         train_acc = correct / total
 
         # Evaluate on the validation set
         val_loss, val_acc = evaluate_model(model, val_loader, criterion, device)
 
-        print(f"Epoch {epoch+1}/{epochs}:")
+        print(f"Epoch {epoch+1}/{epochs} took {time.time() - epoch_start_time:.2f} seconds")
         print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
         print(f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
 
