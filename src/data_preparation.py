@@ -1,12 +1,13 @@
 import os
 from torchvision import transforms, datasets
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import random_split
+from PIL import Image
 
 # Paths
 data_dir = 'path_to_UECFOOD256/'  # Path to your UECFOOD256 dataset directory
-batch_size = 32  # Batch size for DataLoader
-test_size = 0.2  # Fraction of data for validation
+output_dir = 'data/processed/'  # Directory to save processed images
 img_size = (224, 224)  # Image size for resizing
+test_size = 0.2  # Fraction of data for validation
 
 # Define transformations for training and validation sets
 data_transforms = {
@@ -14,47 +15,66 @@ data_transforms = {
         transforms.Resize(img_size),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'val': transforms.Compose([
         transforms.Resize(img_size),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
 }
 
-# Function to load datasets and create PyTorch DataLoaders
-def create_dataloaders(data_dir, test_size, batch_size):
+# Function to save images to appropriate folders
+def save_image(image_tensor, path):
+    """Convert the image tensor back to a PIL image and save it."""
+    image = transforms.ToPILImage()(image_tensor)  # Convert back to PIL image
+    image.save(path)
+
+def split_and_save_images(data_dir, output_dir, test_size):
     """
-    Loads the UECFOOD256 dataset, splits it into training and validation sets,
-    and creates DataLoaders for PyTorch.
+    Splits the dataset into training and validation sets, preprocesses images,
+    and saves them into the appropriate directories.
 
     :param data_dir: Path to the UECFOOD256 dataset
+    :param output_dir: Path to save processed images
     :param test_size: Fraction of data for validation
-    :param batch_size: Batch size for the DataLoader
-    :return: DataLoaders for training and validation sets
     """
-    # Load the entire dataset using ImageFolder, without applying transformations yet
+    # Load the entire dataset using ImageFolder
     full_dataset = datasets.ImageFolder(data_dir)
 
-    # Split dataset into training and validation
+    # Split dataset into training and validation sets
     train_size = int((1 - test_size) * len(full_dataset))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
 
-    # Apply the transformations after the split
-    train_dataset.dataset.transform = data_transforms['train']
-    val_dataset.dataset.transform = data_transforms['val']
+    # Create output directories
+    train_output_dir = os.path.join(output_dir, 'train')
+    val_output_dir = os.path.join(output_dir, 'val')
+    if not os.path.exists(train_output_dir):
+        os.makedirs(train_output_dir)
+    if not os.path.exists(val_output_dir):
+        os.makedirs(val_output_dir)
 
-    # Create DataLoaders for training and validation sets
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    # Save training images
+    print(f"Saving {train_size} training images...")
+    for idx, (image, label) in enumerate(train_dataset):
+        class_name = full_dataset.classes[label]  # Get class name
+        class_dir = os.path.join(train_output_dir, class_name)
+        if not os.path.exists(class_dir):
+            os.makedirs(class_dir)
+        image_path = os.path.join(class_dir, f"image_{idx}.jpg")
+        save_image(data_transforms['train'](image), image_path)
 
-    return train_loader, val_loader
+    # Save validation images
+    print(f"Saving {val_size} validation images...")
+    for idx, (image, label) in enumerate(val_dataset):
+        class_name = full_dataset.classes[label]
+        class_dir = os.path.join(val_output_dir, class_name)
+        if not os.path.exists(class_dir):
+            os.makedirs(class_dir)
+        image_path = os.path.join(class_dir, f"image_{idx}.jpg")
+        save_image(data_transforms['val'](image), image_path)
+
+    print(f"Images successfully saved to {output_dir}")
 
 if __name__ == '__main__':
-    # Create DataLoaders for training and validation sets
-    train_loader, val_loader = create_dataloaders(data_dir, test_size, batch_size)
-
-    print(f"Number of training batches: {len(train_loader)}")
-    print(f"Number of validation batches: {len(val_loader)}")
+    print("Starting data preprocessing and saving...")
+    split_and_save_images(data_dir, output_dir, test_size)
