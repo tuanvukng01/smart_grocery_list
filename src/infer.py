@@ -1,93 +1,82 @@
 import os
+import torch
+from torchvision import transforms
+from PIL import Image
 import numpy as np
-import scipy.io
-import tensorflow as tf
-from tensorflow.keras.preprocessing import image
 
-# Path to the saved model
-model_path = 'models/saved_model/food_model.h5'
+# Path to the saved PyTorch model
+model_path = 'models/saved_model/uecfood_model.pth'
 
 # Image size (must match the size used during training)
 img_size = (224, 224)
 
-# Function to load the test data from the test .mat file
-def load_test_data(mat_file_path):
-    """
-    Loads the test data (image paths and corresponding labels) from the .mat file.
+# Define transformations for inference (same as training)
+transform = transforms.Compose([
+    transforms.Resize(img_size),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
-    :param mat_file_path: Path to the .mat file containing test data
-    :return: Tuple (test_ids, test_images) where test_images are file paths to images
-    """
-    mat = scipy.io.loadmat(mat_file_path)
-
-    # Extract relevant data
-    test_ids = mat['id']  # Extract food IDs
-    test_images = mat['images']  # Extract image file paths
-
-    # Convert the extracted data into usable formats
-    test_ids = [test_id[0] for test_id in test_ids]
-    test_images = [img[0] for img in test_images]
-
-    return test_ids, test_images
 
 # Function to load the trained model
-def load_model(model_path):
+def load_model(model_path, num_classes):
     """
-    Loads the saved Keras model for inference.
+    Loads the trained PyTorch model.
 
     :param model_path: Path to the saved model
-    :return: Loaded Keras model
+    :param num_classes: Number of output classes
+    :return: Loaded PyTorch model
     """
-    return tf.keras.models.load_model(model_path)
+    model = torch.load(model_path)
+    model.eval()  # Set the model to evaluation mode
+    return model
 
-# Function to preprocess a single image for inference
-def preprocess_image(img_path, img_size):
+
+# Function to preprocess an image for inference
+def preprocess_image(img_path):
     """
-    Loads and preprocesses an image for model inference.
+    Preprocesses an image for PyTorch model input.
 
-    :param img_path: Path to the image file
-    :param img_size: Target size for the image
-    :return: Preprocessed image ready for model input
+    :param img_path: Path to the image
+    :return: Preprocessed image tensor
     """
-    img = image.load_img(img_path, target_size=img_size)
-    img_array = image.img_to_array(img) / 255.0  # Normalize the image
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+    img = Image.open(img_path).convert('RGB')
+    img = transform(img).unsqueeze(0)  # Add batch dimension
+    return img
 
-    return img_array
 
-# Function to run inference on a single image
-def predict(model, img_path, img_size):
+# Function to predict the class of an image
+def predict(model, img_path):
     """
-    Predicts the class of the given image using the trained model.
+    Predicts the class of the given image using the trained PyTorch model.
 
-    :param model: Trained Keras model
+    :param model: Trained PyTorch model
     :param img_path: Path to the image to be classified
-    :param img_size: Target image size for the model
     :return: Predicted class index
     """
-    img = preprocess_image(img_path, img_size)
-    predictions = model.predict(img)
-    predicted_class = np.argmax(predictions, axis=1)[0]
+    img = preprocess_image(img_path)
+    with torch.no_grad():
+        outputs = model(img)
+        _, predicted = outputs.max(1)
+    return predicted.item()
 
-    return predicted_class
 
 # Function to evaluate the model on the test set
-def evaluate_model(model, test_images, test_ids, img_size):
+def evaluate_model(model, test_images, test_labels):
     """
-    Evaluates the model on the test set and calculates accuracy.
+    Evaluates the model on the test set.
 
-    :param model: Trained Keras model
+    :param model: Trained PyTorch model
     :param test_images: List of test image paths
-    :param test_ids: List of correct labels for the test images
-    :param img_size: Target image size for preprocessing
+    :param test_labels: List of correct labels for the test images
     :return: Accuracy of the model on the test set
     """
     correct_predictions = 0
     total_images = len(test_images)
 
     for idx, img_path in enumerate(test_images):
-        predicted_class = predict(model, img_path, img_size)
-        if predicted_class == test_ids[idx]:
+        predicted_class = predict(model, img_path)
+        if predicted_class == test_labels[idx]:
             correct_predictions += 1
 
     accuracy = correct_predictions / total_images
@@ -95,13 +84,15 @@ def evaluate_model(model, test_images, test_ids, img_size):
 
     return accuracy
 
+
 if __name__ == '__main__':
     # Load the trained model
-    model = load_model(model_path)
+    num_classes = 256  # Adjust to the number of classes in your dataset
+    model = load_model(model_path, num_classes)
 
-    # Load the test data from the test .mat file
-    test_mat_file_path = 'path_to_test_mat_file.mat'  # Update this with the correct path to your test .mat file
-    test_ids, test_images = load_test_data(test_mat_file_path)
+    # Load the test data
+    test_images = ['path_to_test_image_1.jpg', 'path_to_test_image_2.jpg']  # Update with actual image paths
+    test_labels = [1, 5]  # Update with actual labels
 
     # Evaluate the model on the test set
-    evaluate_model(model, test_images, test_ids, img_size)
+    evaluate_model(model, test_images, test_labels)
