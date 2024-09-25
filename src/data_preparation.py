@@ -1,53 +1,41 @@
 import os
 import cv2
-import scipy.io
 import numpy as np
 from sklearn.model_selection import train_test_split
 
 # Paths
-train_mat_file_path = 'path_to_training_mat_file.mat'  # Update with your training .mat file path
-image_folder = 'data/food475/images/'  # Folder where images are stored
-output_dir = 'data/processed/'  # Where the processed images will be saved
+data_dir = 'path_to_UECFOOD256/'  # Path to your UECFOOD256 dataset directory
+output_dir = 'data/processed/'  # Directory to save processed images
 
 # Image settings
 img_size = (224, 224)  # Image size for resizing
 test_size = 0.2  # Fraction of data for validation
 
 
-# Function to load food names and IDs
-def load_food_data(mat_file_path):
+# Function to load image paths and labels
+def load_food_data(data_dir):
     """
-    Loads the food names and IDs from a .mat file.
+    Loads image file paths and corresponding labels from the UECFOOD256 dataset.
 
-    :param mat_file_path: Path to the .mat file containing food data
-    :return: Tuple (food_ids, food_names)
+    :param data_dir: Path to the UECFOOD256 dataset
+    :return: Tuple (image_paths, labels)
     """
-    # Load the .mat file
-    mat = scipy.io.loadmat(mat_file_path)
+    image_paths = []
+    labels = []
+    label_map = {}
 
-    # Extract relevant data
-    food_ids = mat['id']  # Extract food IDs
-    food_names = mat['name']  # Extract food names
+    # Loop through the directories corresponding to food classes
+    for idx, class_dir in enumerate(os.listdir(data_dir)):
+        class_path = os.path.join(data_dir, class_dir)
+        if os.path.isdir(class_path):
+            label_map[class_dir] = idx  # Map the food class to an integer label
+            for img_file in os.listdir(class_path):
+                img_path = os.path.join(class_path, img_file)
+                if img_file.endswith('.jpg'):
+                    image_paths.append(img_path)
+                    labels.append(idx)
 
-    # Convert the extracted data into usable formats
-    food_ids = [food_id[0] for food_id in food_ids]
-    food_names = [food_name[0] for food_name in food_names]
-
-    return food_ids, food_names
-
-
-# Function to construct image paths based on food IDs or names
-def get_image_path(food_id):
-    """
-    Constructs the image path based on the food ID.
-
-    :param food_id: ID of the food item
-    :return: Full image path
-    """
-    # Construct image path based on the food ID (adjust this to match your file structure)
-    image_filename = f"{food_id}.jpg"  # Assuming images are named by food ID
-    image_path = os.path.join(image_folder, image_filename)
-    return image_path
+    return image_paths, labels, label_map
 
 
 # Function to save images to the output directory
@@ -56,8 +44,8 @@ def save_images(images, labels, output_dir):
     Saves processed images to the output directory.
 
     :param images: List of preprocessed images
-    :param labels: Corresponding labels (IDs) for each image
-    :param output_dir: Directory where the processed images will be saved
+    :param labels: Corresponding labels for each image
+    :param output_dir: Directory where processed images will be saved
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -70,27 +58,23 @@ def save_images(images, labels, output_dir):
 
 
 # Function to preprocess images and split data
-def preprocess_images(food_ids, output_dir, img_size, test_size):
+def preprocess_images(image_paths, labels, output_dir, img_size, test_size):
     """
     Processes images and creates train/validation split.
 
-    :param food_ids: List of food IDs
+    :param image_paths: List of image file paths
+    :param labels: Corresponding labels for each image
     :param output_dir: Directory to save processed images
     :param img_size: Tuple for resizing images
     :param test_size: Fraction of data for validation
     """
     images = []
-    labels = []
-
-    for food_id in food_ids:
-        image_path = get_image_path(food_id)
-
+    for img_path in image_paths:
         # Read and resize the image (using OpenCV)
-        img = cv2.imread(image_path)
+        img = cv2.imread(img_path)
         if img is not None:
             img = cv2.resize(img, img_size)
             images.append(img)
-            labels.append(food_id)
 
     # Convert lists to numpy arrays
     images = np.array(images)
@@ -107,8 +91,8 @@ def preprocess_images(food_ids, output_dir, img_size, test_size):
 
 
 if __name__ == '__main__':
-    # Load food data from the training .mat file
-    food_ids, food_names = load_food_data(train_mat_file_path)
+    # Load image paths and labels from UECFOOD256
+    image_paths, labels, label_map = load_food_data(data_dir)
 
     # Preprocess images and split into train and validation sets
-    preprocess_images(food_ids, output_dir, img_size, test_size)
+    preprocess_images(image_paths, labels, output_dir, img_size, test_size)
